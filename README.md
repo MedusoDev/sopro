@@ -8,11 +8,11 @@ sem rastreio. So um lembrete de que a vida e maior que o trabalho.
 
 ## Como funciona
 
-- Voce escolhe o intervalo (1h a 24h) e liga.
+- Esta sempre ligado. Voce so escolhe o intervalo (1h a 24h).
 - O app agenda 30 notificacoes locais, uma por intervalo, cada uma com uma
   frase diferente. Toda vez que o app abre, a fila e refeita.
-- As frases sao de autores em dominio publico (Pessoa, Camoes, Seneca,
-  Marco Aurelio, Rumi, Basho, Whitman, Dickinson, Rilke, Tagore...).
+- As frases sao de poetas e pensadores da antiguidade e do Oriente, todos em
+  dominio publico: gregos, romanos, chineses, persas, japoneses, indianos.
 
 ## Rodar
 
@@ -21,12 +21,16 @@ npm install
 npx expo start
 ```
 
-Abra no Expo Go (Android) ou gere um build de desenvolvimento com
-`npx expo run:android`.
+O `expo-notifications` nao roda no Expo Go (Android, SDK 53+), entao use um
+build proprio: `eas build --platform android --profile preview` gera o APK
+standalone; `--profile development` gera o dev client com hot reload.
+
+Para regenerar os icones a partir da logo: `node tools/gerar_icones.mjs`.
 
 ## Estrutura
 
-- `App.tsx` — tela unica: frase do momento, liga/desliga, intervalo, teste.
+- `App.tsx` — tela unica: frase do momento, intervalo, teste.
 - `src/quotes.ts` — banco de frases.
 - `src/notifications.ts` — canal, permissao e agendamento.
 - `src/storage.ts` — configuracao persistida com AsyncStorage.
+- `tools/gerar_icones.mjs` — logo em SVG e geracao de todos os PNGs.

@@ -8,6 +8,8 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#14120F",
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#14120F"
     },
     "ios": {
@@ -28,6 +30,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#C9A96E",
           "defaultChannel": "sopro"
         }

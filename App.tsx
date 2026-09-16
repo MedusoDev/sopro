@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   AppState,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -20,7 +19,6 @@ import {
   saveSettings,
 } from "./src/storage";
 import {
-  cancelAll,
   nextScheduledDate,
   requestPermission,
   scheduleQueue,
@@ -36,73 +34,48 @@ const COLORS = {
   muted: "#8F8674",
   accent: "#C9A96E",
   accentText: "#14120F",
+  danger: "#C97A6E",
 };
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [quote, setQuote] = useState<Quote>(() => randomQuote());
   const [next, setNext] = useState<Date | null>(null);
-  const [ready, setReady] = useState(false);
+  const [permitted, setPermitted] = useState<boolean | null>(null);
 
   const refreshNext = useCallback(async () => {
     setNext(await nextScheduledDate());
   }, []);
 
-  // Ao abrir: carrega config, cria canal e refaz a fila se estiver ligado.
-  useEffect(() => {
-    (async () => {
-      await setupChannel();
-      const s = await loadSettings();
-      setSettings(s);
-      if (s.enabled) await scheduleQueue(s.intervalHours);
-      await refreshNext();
-      setReady(true);
-    })();
-
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshNext();
-    });
-    return () => sub.remove();
+  // O sopro esta sempre ligado: ao abrir, pede permissao e refaz a fila.
+  const boot = useCallback(async () => {
+    await setupChannel();
+    const s = await loadSettings();
+    setSettings(s);
+    const ok = await requestPermission();
+    setPermitted(ok);
+    if (ok) await scheduleQueue(s.intervalHours);
+    await refreshNext();
   }, [refreshNext]);
 
-  const apply = useCallback(
-    async (nextSettings: Settings) => {
-      setSettings(nextSettings);
-      await saveSettings(nextSettings);
-      if (nextSettings.enabled) {
-        await scheduleQueue(nextSettings.intervalHours);
-      } else {
-        await cancelAll();
-      }
-      await refreshNext();
-    },
-    [refreshNext]
-  );
-
-  const toggleEnabled = async (value: boolean) => {
-    if (value) {
-      const ok = await requestPermission();
-      if (!ok) {
-        Alert.alert(
-          "Sem permissão",
-          "O sopro precisa de permissão de notificação para funcionar. Libere nas configurações do sistema."
-        );
-        return;
-      }
-    }
-    await apply({ ...settings, enabled: value });
-  };
+  useEffect(() => {
+    boot();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") boot();
+    });
+    return () => sub.remove();
+  }, [boot]);
 
   const pickInterval = async (hours: number) => {
-    await apply({ ...settings, intervalHours: hours });
+    const s = { ...settings, intervalHours: hours };
+    setSettings(s);
+    await saveSettings(s);
+    if (permitted) await scheduleQueue(hours);
+    await refreshNext();
   };
 
   const test = async () => {
-    const ok = await requestPermission();
-    if (!ok) {
-      Alert.alert("Sem permissão", "Libere as notificações para receber o teste.");
-      return;
-    }
+    if (!permitted) return;
     await sendTestNotification();
   };
 
@@ -124,27 +97,7 @@ export default function App() {
         </Pressable>
 
         <View style={styles.section}>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Sopros ligados</Text>
-              <Text style={styles.sub}>
-                {ready && settings.enabled && next
-                  ? `próximo ${formatNext(next)}`
-                  : "nenhum sopro agendado"}
-              </Text>
-            </View>
-            <Switch
-              value={settings.enabled}
-              onValueChange={toggleEnabled}
-              disabled={!ready}
-              trackColor={{ false: COLORS.border, true: COLORS.accent }}
-              thumbColor={COLORS.text}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>A cada</Text>
+          <Text style={styles.label}>Um sopro a cada</Text>
           <View style={styles.chips}>
             {INTERVAL_OPTIONS.map((h) => {
               const active = h === settings.intervalHours;
@@ -161,11 +114,27 @@ export default function App() {
               );
             })}
           </View>
+          <Text style={styles.sub}>
+            {permitted === false
+              ? "sem permissão de notificação"
+              : next
+              ? `próximo ${formatNext(next)}`
+              : "preparando os próximos sopros..."}
+          </Text>
+          {permitted === false && (
+            <Pressable onPress={() => Linking.openSettings()}>
+              <Text style={styles.link}>liberar nas configurações do sistema</Text>
+            </Pressable>
+          )}
         </View>
 
         <Pressable
           onPress={test}
-          style={({ pressed }) => [styles.testButton, pressed && { opacity: 0.7 }]}
+          disabled={!permitted}
+          style={({ pressed }) => [
+            styles.testButton,
+            (pressed || !permitted) && { opacity: 0.6 },
+          ]}
         >
           <Text style={styles.testButtonText}>Mandar um sopro agora</Text>
         </Pressable>
@@ -233,9 +202,9 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 },
   label: { color: COLORS.text, fontSize: 16, fontWeight: "600" },
-  sub: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
+  sub: { color: COLORS.muted, fontSize: 13 },
+  link: { color: COLORS.danger, fontSize: 13, textDecorationLine: "underline" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     paddingVertical: 8,
