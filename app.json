@@ -32,6 +32,12 @@
           "defaultChannel": "sopro"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "03656e92-62f8-4f6b-9033-2fd1b1f96c3b"
+      }
+    },
+    "owner": "medusa6991"
   }
 }
